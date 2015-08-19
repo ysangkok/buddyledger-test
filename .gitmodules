@@ -1,0 +1,3 @@
+[submodule "buddyledger"]
+	path = buddyledger
+	url = git@github.com:tykling/buddyledger.git
