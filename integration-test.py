@@ -27,7 +27,7 @@ fi
 if [ ! -e apache-ivy-2.4.0 ]; then curl -L http://apache.mesi.com.ar/ant/ivy/2.4.0/apache-ivy-2.4.0-bin-with-deps.tar.gz | tar zx; fi
 export CLASSPATH="lib/sqlite-jdbc-3.8.11.1.jar"
 #./jython-2.7/bin/jython buddyledger/src/manage.py migrate
-JYTHONPATH=buddyledger/src/:apache-ivy-2.4.0/ivy-2.4.0.jar exec ./jython-2.7/bin/jython "$0"
+JYTHONPATH=buddyledger/src/:apache-ivy-2.4.0/ivy-2.4.0.jar exec time ./jython-2.7/bin/jython "$0"
 '''
 import sys, os.path, glob, unittest, time, django, tempfile, re, subprocess
 from zipfile import ZipFile
@@ -66,8 +66,12 @@ class SimpleTest(unittest.TestCase):
         self.client = Client()
 
     def test_create_ledger(self):
-        response = self.client.post('/ledger/create/', {'currency': 'AUD', 'name': 'test{}'.format(time.time())})
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post('/ledger/create/', {'currency': '1', 'name': 'test{}'.format(time.time())})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, 'http://testserver/ledger/1')
+
+    def test_invalid_ledger(self):
+        response = self.client.post('/ledger/create/', {'currency': '', 'name': 'test{}'.format(time.time())})
         with tempfile.NamedTemporaryFile(delete=False) as f:
             for match in re.finditer(r'"//([^"]+)"', response.content):
                 url = match.group(1)
@@ -75,10 +79,9 @@ class SimpleTest(unittest.TestCase):
             f.write(response.content.replace("\"//", "\"file://{}/".format(os.getcwd())).replace("\"/static/","\"http://localhost:8080/buddyledger/static/".format(os.getcwd())))
             name = f.name
         page = self.webclient.getPage("file://" + f.name)
-        #pdb.set_trace()
         alert = page.getFirstByXPath("//*[contains(@class, 'alert')]")
-        assert alert is None, alert.asText()
-        #self.assertEqual(len(response.context['customers']), 5)
+        assert alert is not None, "post was invalid, there should be an alert"
+        print(alert.asText())
 
 #def gotopage():
 #    print('hello, I will visit Google')
@@ -102,6 +105,7 @@ if __name__ == "__main__":
     except:
         pass
     execute_from_command_line(["bogus", "migrate"])
+    execute_from_command_line(["bogus", "getcurrency"])
 
     download_htmlunit()
     add_htmlunit_to_classpath()
